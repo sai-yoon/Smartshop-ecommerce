@@ -1,42 +1,66 @@
 <?php
+// Import authentication script to ensure only authorized users can access this page
 require 'auth.php';
+
+// Enable detailed error reporting for development/debugging purposes
 ini_set('display_errors', 1);
 ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
-$finalDesc = "";
+// Initialize variables for final product description, image tags, display values, and error tracking
+$finalDesc = ""; 
 $tags = "";
 $displayProductName = "";
 $displayImageUrl = "";
 $errors = [];
 
+// Check if the request method is POST (meaning the form was submitted)
 if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    
+    // Securely retrieve 'product_name' and 'short_desc' inputs, allowing raw content for flexibility
     $productName = filter_input(INPUT_POST, 'product_name', FILTER_UNSAFE_RAW);
     $shortDesc = filter_input(INPUT_POST, 'short_desc', FILTER_UNSAFE_RAW);
+
+    // Clean the inputs: remove any HTML tags and unnecessary whitespace
     $productName = $productName ? strip_tags(trim($productName)) : '';
     $shortDesc = $shortDesc ? strip_tags(trim($shortDesc)) : '';
 
+    // Basic form validation: ensure all fields are filled, including the image upload
     if (empty($productName) || empty($shortDesc) || empty($_FILES['image']['name'])) {
         $errors[] = "All fields are required.";
     } else {
+        
+        // Define the upload directory for product images
         $uploadDir = "Uploads/";
+        
+        // Create the upload directory if it doesn't exist, with appropriate permissions
         if (!file_exists($uploadDir)) {
             mkdir($uploadDir, 0755, true);
         }
 
+        // Sanitize the uploaded image's name to remove unwanted characters
         $imageName = basename($_FILES["image"]["name"]);
         $imageName = preg_replace("/[^A-Za-z0-9._-]/", "", $imageName);
+
+        // Build the full target path for the uploaded image, prepending a timestamp for uniqueness
         $targetPath = $uploadDir . time() . "_" . $imageName;
 
+        // Define allowed image types and maximum file size (5MB)
         $allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-        $maxSize = 5 * 1024 * 1024;
+        $maxSize = 5 * 1024 * 1024; // 5MB
+
+        // Validate image type and size
         if (!in_array($_FILES['image']['type'], $allowedTypes) || $_FILES['image']['size'] > $maxSize) {
             $errors[] = "Invalid image type or size. Use JPEG/PNG/GIF under 5MB.";
         } else {
+            
+            // Attempt to move the uploaded image to the target path
             if (move_uploaded_file($_FILES["image"]["tmp_name"], $targetPath)) {
+                
+                // Construct the full URL to the uploaded image for external API use
                 $imageUrl = "http://" . $_SERVER['HTTP_HOST'] . dirname($_SERVER['PHP_SELF']) . "/$targetPath";
 
-                // Imagga
+                /** ---------- IMAGGA API CALL: Fetch Image Tags ---------- **/
                 $imaggaCurl = curl_init();
                 curl_setopt_array($imaggaCurl, [
                     CURLOPT_URL => "https://api.imagga.com/v2/tags?image_url=" . urlencode($imageUrl),
@@ -45,32 +69,38 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                         "Authorization: Basic " . base64_encode("acc_54c84bf26eb4b73:ed77c49a46b5b55a1ac79441d7dd2223")
                     ],
                 ]);
+                
                 $imaggaResponse = curl_exec($imaggaCurl);
                 $imaggaError = curl_error($imaggaCurl);
                 curl_close($imaggaCurl);
 
+                // Handle potential API error
                 if ($imaggaError) {
                     $errors[] = "Imagga API Error: $imaggaError";
                 } else {
+                    // Decode the JSON response into an associative array
                     $imaggaData = json_decode($imaggaResponse, true);
 
+                    // Extract top 10 tags from the response if available
                     if (!empty($imaggaData['result']['tags'])) {
                         $tagNames = array_map(function ($tag) {
-                            return htmlspecialchars($tag['tag']['en']);
+                            return htmlspecialchars($tag['tag']['en']); // Sanitize each tag
                         }, array_slice($imaggaData['result']['tags'], 0, 10));
+
+                        // Combine tags into a comma-separated string
                         $tags = implode(", ", $tagNames);
                     } else {
                         $errors[] = "No tags found.";
                     }
                 }
 
-                // Product Description API
+                /** ---------- PRODUCT DESCRIPTION API CALL ---------- **/
                 $descCurl = curl_init();
                 curl_setopt_array($descCurl, [
                     CURLOPT_URL => "https://ai-ecommerce-product-description-generator.p.rapidapi.com/generate_product_description?" . http_build_query([
                         "language" => "English",
                         "name" => $productName,
-                        "description" => $shortDesc . " " . $tags
+                        "description" => $shortDesc . " " . $tags // Tags enhance the description generation
                     ]),
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_HTTPHEADER => [
@@ -83,15 +113,22 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                 $descError = curl_error($descCurl);
                 curl_close($descCurl);
 
+                // Handle API error if present
                 if ($descError) {
                     $errors[] = "Description API Error: $descError";
                 } else {
+                    // Decode the API response
                     $descData = json_decode($descResponse, true);
 
+                    // Case 1: 'product_description' is present as a full description string
                     if (isset($descData['product_description'])) {
+                        
+                        // Split the description into sentences for better paragraph formatting
                         $sentences = preg_split('/(?<=[.!?])\s+/', $descData['product_description'], -1, PREG_SPLIT_NO_EMPTY);
                         $paragraphs = [];
                         $currentParagraph = '';
+
+                        // Group sentences into paragraphs of 3 sentences each
                         foreach ($sentences as $index => $sentence) {
                             $currentParagraph .= $sentence . ' ';
                             if (($index + 1) % 3 == 0 || $index == count($sentences) - 1) {
@@ -99,16 +136,25 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
                                 $currentParagraph = '';
                             }
                         }
+
+                        // Combine paragraphs into the final product description, sanitizing output
                         $finalDesc = implode("\n\n", array_map('htmlspecialchars', $paragraphs));
+
+                    // Case 2: Alternate response format with multiple description suggestions
                     } elseif (isset($descData['descriptions']) && is_array($descData['descriptions'])) {
                         $finalDesc = htmlspecialchars(implode("\n\n", $descData['descriptions']));
+                    
+                    // No valid description returned
                     } else {
                         $errors[] = "No description returned.";
                     }
                 }
 
+                // Prepare sanitized values for display in the frontend
                 $displayProductName = htmlspecialchars($productName);
                 $displayImageUrl = htmlspecialchars($imageUrl);
+            
+            // Image upload failed
             } else {
                 $errors[] = "Image upload failed.";
             }
