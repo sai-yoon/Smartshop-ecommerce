@@ -65,6 +65,10 @@ $orderCount = $stmtOrders->fetch()['total'];
             <span class="transition-colors duration-300 group-hover:text-main-teal">My Products</span>
             <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-main-teal transition-all duration-300 group-hover:w-full"></span>
         </a>
+        <a href="generate_description.php" class="relative group">
+            <span class="transition-colors duration-300 group-hover:text-indigo-600">Generate Description</span>
+            <span class="absolute bottom-0 left-0 w-0 h-0.5 bg-indigo-500 transition-all duration-300 group-hover:w-full"></span>
+        </a>
         <a href="logout.php" class="relative group text-red-600 hover:text-red-700 transition">
             Logout
         </a>
@@ -88,6 +92,7 @@ $orderCount = $stmtOrders->fetch()['total'];
         </div>
     </div>
 
+    <!-- ACTION CARDS -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <a href="add_product.php" class="block p-4 bg-teal-500 text-white rounded-lg shadow hover:bg-teal-600 transition text-center font-medium">
             ➕ Add New Product
@@ -95,6 +100,10 @@ $orderCount = $stmtOrders->fetch()['total'];
 
         <a href="my_products.php" class="block p-4 bg-cyan-500 text-white rounded-lg shadow hover:bg-cyan-600 transition text-center font-medium">
             📋 Manage My Products
+        </a>
+
+        <a href="generate_description.php" class="block p-4 bg-indigo-500 text-white rounded-lg shadow hover:bg-indigo-600 transition text-center font-medium">
+            🤖 Generate Description
         </a>
 
         <a href="edit_profile.php" class="block p-4 bg-yellow-500 text-white rounded-lg shadow hover:bg-yellow-600 transition text-center font-medium">
