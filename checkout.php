@@ -161,10 +161,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['place_order'])) {
                     </div>
 
                     <div class="md:col-span-2">
-                        <label class="block font-medium text-gray-700">Address</label>
-                        <textarea id="address" name="address" required
-                            class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2"><?= htmlspecialchars($user['address']) ?></textarea>
+                         <label class="block font-medium text-gray-700">Address</label>
+                         <textarea id="address" name="address" required class="mt-1 block w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2"><?= htmlspecialchars($user['shipping_address'] ?? $user['address'] ?? '') ?>
+                        </textarea>
                     </div>
+
 
                     <div>
                         <label class="block font-medium text-gray-700">Contact Number</label>

@@ -1,5 +1,6 @@
 <?php
 require 'db.php';
+session_start();
 
 $message = '';
 
@@ -19,13 +20,29 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
         $stmt = $pdo->prepare("INSERT INTO users (full_name, email, password, user_type) VALUES (?, ?, ?, ?)");
         try {
             $stmt->execute([$full_name, $email, $password, $user_type]);
-            $message = "Account created successfully! <a href='login.php' class='underline text-teal-700'>Login</a>";
+
+            // Fetch the newly created user to initialize session
+            $user_id = $pdo->lastInsertId();
+
+            $_SESSION['user_id'] = $user_id;
+            $_SESSION['user_type'] = $user_type;
+            $_SESSION['full_name'] = $full_name;
+
+            // Redirect based on user type
+            if ($user_type === 'customer') {
+                header("Location: customer_dashboard.php");
+            } else {
+                header("Location: seller_dashboard.php");
+            }
+            exit;
+
         } catch (PDOException $e) {
             $message = "Error: " . $e->getMessage();
         }
     }
 }
 ?>
+
 
 <!DOCTYPE html>
 <html lang="en">
